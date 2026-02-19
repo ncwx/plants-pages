@@ -19,3 +19,19 @@ A gamified reading tracker where users build a virtual garden based on their rea
 
 ## Status
 In active development
+
+## Local Development
+Prereqs: Node.js 18+, Python 3.11+, and GNU Make.
+
+Setup dependencies:
+- `make setup`
+
+Run web + api:
+- `make dev`
+
+Run API tests:
+- `make test-api`
+
+Lint and format:
+- `make lint`
+- `make fmt`
