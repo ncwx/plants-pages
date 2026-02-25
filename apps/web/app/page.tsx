@@ -37,6 +37,25 @@ export default function Home() {
         <>
           <p>Logged in as: {user.email}</p>
           <button onClick={handleLogout}>Logout</button>
+          <button
+            onClick={async () => {
+              const { data } = await supabase.auth.getSession()
+              const token = data.session?.access_token
+              if (!token) {
+                alert('Not logged in')
+                return
+              }
+
+              const res = await fetch('http://localhost:8000/whoami', {
+                headers: { Authorization: `Bearer ${token}` },
+              })
+
+              const text = await res.text()
+              alert(text)
+            }}
+          >
+            Test /whoami
+          </button>
         </>
       ) : (
         <>
