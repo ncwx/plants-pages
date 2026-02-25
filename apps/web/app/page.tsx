@@ -41,12 +41,16 @@ export default function Home() {
             onClick={async () => {
               const { data } = await supabase.auth.getSession()
               const token = data.session?.access_token
+
+              console.log("ACCESS TOKEN:", token)
+
+
               if (!token) {
                 alert('Not logged in')
                 return
               }
 
-              const res = await fetch('http://localhost:8000/whoami', {
+              const res = await fetch('http://localhost:8000/me', {
                 headers: { Authorization: `Bearer ${token}` },
               })
 

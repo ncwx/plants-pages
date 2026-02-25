@@ -23,11 +23,10 @@ from .deps import get_current_user
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
-@app.get("/whoami")
-def whoami(user=Depends(get_current_user)):
-    # user contains JWT claims like sub, email, role, etc.
+@app.get("/me")
+def me(user=Depends(get_current_user)):
     return {
-        "user_id": user.get("sub"),
+        "id": user.get("sub"),
         "email": user.get("email"),
         "role": user.get("role"),
     }
