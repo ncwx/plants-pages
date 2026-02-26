@@ -99,3 +99,34 @@ def verify_supabase_jwt(token: str) -> Dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+from dataclasses import dataclass
+from fastapi import Header
+
+@dataclass
+class CurrentUser:
+    id: str
+    token: str
+    claims: Dict[str, Any]
+
+def get_bearer_token(authorization: Optional[str]) -> str:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Bearer token",
+        )
+    return authorization.split(" ", 1)[1].strip()
+
+async def get_current_user(authorization: Optional[str] = Header(None)) -> CurrentUser:
+    token = get_bearer_token(authorization)
+    claims = verify_supabase_jwt(token)
+
+    # Supabase puts the user id in the "sub" claim for JWTs
+    user_id = claims.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing sub",
+        )
+
+    return CurrentUser(id=user_id, token=token, claims=claims)
