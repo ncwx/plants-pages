@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, apiDelete } from "@/lib/api";
 
 type Book = {
   id: string;
@@ -86,6 +86,37 @@ export default function LibraryPage() {
     }
   }
 
+  async function remove(bookId: string) {
+    if (!confirm("Remove this book from your library?")) return;
+
+    setErr(null);
+
+    // Optimistic UI
+    setItems((xs) => xs.filter((it) => it.book_id !== bookId));
+    setDrafts((m) => {
+      const copy = { ...m };
+      delete copy[bookId];
+      return copy;
+    });
+    setSavedFor((m) => {
+      const copy = { ...m };
+      delete copy[bookId];
+      return copy;
+    });
+    setSavingFor((m) => {
+      const copy = { ...m };
+      delete copy[bookId];
+      return copy;
+    });
+
+    try {
+      await apiDelete(`/books/me/library/${encodeURIComponent(bookId)}`);
+    } catch (e: any) {
+      await load(); // reliable rollback
+      setErr(e.message ?? "Failed to remove book");
+    }
+  }
+
   const isEmpty = useMemo(() => items.length === 0, [items.length]);
 
   return (
@@ -112,9 +143,25 @@ export default function LibraryPage() {
                   </div>
                 </div>
 
-                <Link href={`/books/${it.book_id}`} style={{ textDecoration: "none" }}>
-                  Open
-                </Link>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <Link href={`/books/${it.book_id}`} style={{ textDecoration: "none" }}>
+                    Open
+                  </Link>
+
+                  <button
+                    onClick={() => remove(it.book_id)}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #f3c2c2",
+                      background: "white",
+                      color: "crimson",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
 
               {/* Controls */}

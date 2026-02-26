@@ -35,3 +35,13 @@ export async function apiPost<T>(path: string, body: any): Promise<T> {
   if (!res.ok) throw new Error(await getErrorMessage(res));
   return res.json();
 }
+
+export async function apiDelete(path: string): Promise<void> {
+  const headers = { ...(await authHeader()) };
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers,
+  });
+  if (!res.ok) throw new Error(await getErrorMessage(res));
+  // Most DELETE endpoints return 204 No Content, so no res.json()
+}

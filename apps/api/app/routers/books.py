@@ -2,7 +2,7 @@ import os
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from supabase import create_client
 
 from app.auth import get_current_user, CurrentUser
@@ -49,6 +49,14 @@ def my_library(user: CurrentUser = Depends(get_current_user)):
     )
     return res.data or []
 
+
+@router.delete("/me/library/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_from_library(book_id: UUID, user: CurrentUser = Depends(get_current_user)):
+    authed = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    authed.postgrest.auth(user.token)
+
+    authed.table("user_books").delete().eq("user_id", user.id).eq("book_id", str(book_id)).execute()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.get("/{book_id}", response_model=BookOut)
 def get_book(book_id: UUID):
