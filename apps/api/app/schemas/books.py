@@ -4,6 +4,7 @@ from uuid import UUID
 
 ReadingStatus = Literal["want_to_read", "reading", "finished", "dnf"]
 
+
 class BookOut(BaseModel):
     id: UUID
     title: str
@@ -14,6 +15,7 @@ class BookOut(BaseModel):
     cover_url: Optional[str] = None
     published_year: Optional[int] = None
 
+
 class BookCreate(BaseModel):
     title: str = Field(min_length=1)
     author: Optional[str] = None
@@ -23,6 +25,7 @@ class BookCreate(BaseModel):
     cover_url: Optional[str] = None
     published_year: Optional[int] = None
 
+
 class UserBookOut(BaseModel):
     id: UUID
     user_id: UUID
@@ -30,8 +33,12 @@ class UserBookOut(BaseModel):
     status: ReadingStatus
     rating: Optional[int] = None
     notes: Optional[str] = None
+    progress: int = 0 
+    books: Optional[BookOut] = None
+
 
 class UserBookUpsert(BaseModel):
     status: ReadingStatus = "want_to_read"
     rating: Optional[int] = Field(default=None, ge=1, le=5)
     notes: Optional[str] = None
+    progress: Optional[int] = Field(default=None, ge=0, le=100)

@@ -12,23 +12,22 @@ type Book = {
 };
 
 type LibraryItem = {
-  id: string; // user_books row id
+  id: string;
   book_id: string;
   status: "want_to_read" | "reading" | "finished" | "dnf";
   rating?: number | null;
   notes?: string | null;
-  books?: Book | null; // embedded
+  progress?: number | null;
+  books?: Book | null;
 };
 
 type Draft = {
   status: LibraryItem["status"];
   rating: number | "";
   notes: string;
+  progress: number | "";
 };
 
-/**
- * Tiny "design tokens" (edit these later to redesign fast)
- */
 const UI = {
   pageMaxWidth: 920,
   radiusCard: 16,
@@ -39,7 +38,6 @@ const UI = {
   bg: "#ffffff",
   cardBg: "#ffffff",
   shadow: "0 10px 30px rgba(17, 24, 39, 0.06)",
-  // subtle pink accent (flexible)
   accent: "#b4236a",
   accentSoftBg: "#fff1f7",
   accentSoftBorder: "#ffd0e4",
@@ -65,7 +63,6 @@ function pillStyle(): React.CSSProperties {
     border: `1px solid ${UI.border}`,
     background: "#fafafa",
     color: UI.muted,
-    whiteSpace: "nowrap",
   };
 }
 
@@ -90,11 +87,12 @@ export default function LibraryPage() {
           status: it.status,
           rating: it.rating ?? "",
           notes: it.notes ?? "",
+          progress: it.progress ?? 0,
         };
       }
       setDrafts(initial);
     } catch (e: any) {
-      setErr(e.message ?? "Failed to load library");
+      setErr(e.message ?? "Failed to load library :(");
     } finally {
       setLoading(false);
     }
@@ -110,12 +108,15 @@ export default function LibraryPage() {
 
     setSavingFor((m) => ({ ...m, [bookId]: true }));
     setErr(null);
+
     try {
       await apiPost(`/books/${bookId}/save`, {
         status: d.status,
         rating: d.rating === "" ? null : Number(d.rating),
         notes: d.notes?.trim() ? d.notes : null,
+        progress: d.progress === "" ? null : Number(d.progress),
       });
+
       await load();
 
       setSavedFor((m) => ({ ...m, [bookId]: true }));
@@ -123,7 +124,7 @@ export default function LibraryPage() {
         setSavedFor((m) => ({ ...m, [bookId]: false }));
       }, 1500);
     } catch (e: any) {
-      setErr(e.message ?? "Failed to save changes");
+      setErr(e.message ?? "Failed to save changes :(");
     } finally {
       setSavingFor((m) => ({ ...m, [bookId]: false }));
     }
@@ -133,31 +134,12 @@ export default function LibraryPage() {
     const title = items.find((it) => it.book_id === bookId)?.books?.title ?? "this book";
     if (!confirm(`Remove "${title}" from your library?`)) return;
 
-    setErr(null);
-
-    // Optimistic UI
     setItems((xs) => xs.filter((it) => it.book_id !== bookId));
-    setDrafts((m) => {
-      const copy = { ...m };
-      delete copy[bookId];
-      return copy;
-    });
-    setSavedFor((m) => {
-      const copy = { ...m };
-      delete copy[bookId];
-      return copy;
-    });
-    setSavingFor((m) => {
-      const copy = { ...m };
-      delete copy[bookId];
-      return copy;
-    });
 
     try {
       await apiDelete(`/books/me/library/${encodeURIComponent(bookId)}`);
-    } catch (e: any) {
+    } catch {
       await load();
-      setErr(e.message ?? "Failed to remove book");
     }
   }
 
@@ -165,139 +147,23 @@ export default function LibraryPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: UI.bg }}>
-      <div
-        style={{
-          maxWidth: UI.pageMaxWidth,
-          margin: "0 auto",
-          padding: "34px 22px",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-end",
-            gap: 16,
-            marginBottom: 18,
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: 26,
-                fontWeight: 650,
-                letterSpacing: "-0.02em",
-                color: UI.text,
-              }}
-            >
-              My Library
-            </h1>
-            <p style={{ margin: "8px 0 0", fontSize: 13, color: UI.muted, lineHeight: 1.4 }}>
-              Update status, ratings, and notes. Keep it simple.
-            </p>
-          </div>
+      <div style={{ maxWidth: UI.pageMaxWidth, margin: "0 auto", padding: "34px 22px" }}>
+        <h1 style={{ fontSize: 26 }}>My Library</h1>
 
-          <Link
-            href="/books"
-            style={{
-              textDecoration: "none",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "10px 12px",
-              borderRadius: UI.radiusControl,
-              border: `1px solid ${UI.accentSoftBorder}`,
-              background: UI.accentSoftBg,
-              color: UI.accent,
-              fontSize: 13,
-              fontWeight: 650,
-              whiteSpace: "nowrap",
-            }}
-          >
-            Browse books
-          </Link>
-        </div>
-
-        {err && (
-          <div
-            style={{
-              marginTop: 12,
-              padding: "10px 12px",
-              borderRadius: UI.radiusControl,
-              border: `1px solid ${UI.dangerBorder}`,
-              background: UI.dangerBg,
-              color: UI.danger,
-              fontSize: 13,
-            }}
-          >
-            {err}
-          </div>
-        )}
-
-        {loading && (
-          <div
-            style={{
-              marginTop: 14,
-              padding: 16,
-              borderRadius: UI.radiusCard,
-              border: `1px solid ${UI.border}`,
-              background: UI.cardBg,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-              fontSize: 14,
-              color: UI.muted,
-            }}
-          >
-            Loading your library…
-          </div>
-        )}
+        {loading && <p>Loading…</p>}
 
         {!loading && isEmpty && (
-          <div
-            style={{
-              marginTop: 14,
-              padding: 16,
-              borderRadius: UI.radiusCard,
-              border: `1px solid ${UI.border}`,
-              background: UI.cardBg,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-            }}
-          >
-            <div style={{ fontWeight: 650, color: UI.text }}>No books saved yet</div>
-            <div style={{ marginTop: 6, fontSize: 13, color: UI.muted }}>
-              Add something from the catalogue — you can always edit later.
-            </div>
-            <div style={{ marginTop: 12 }}>
-              <Link
-                href="/books"
-                style={{
-                  textDecoration: "none",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "10px 12px",
-                  borderRadius: UI.radiusControl,
-                  border: `1px solid ${UI.accentSoftBorder}`,
-                  background: UI.accentSoftBg,
-                  color: UI.accent,
-                  fontSize: 13,
-                  fontWeight: 650,
-                }}
-              >
-                Browse books
-              </Link>
-            </div>
+          <div>
+            <p>No books saved yet :(</p>
+            <Link href="/books">Browse books</Link>
           </div>
         )}
 
-        {/* List */}
         {!loading && (
-          <div style={{ marginTop: 16, display: "grid", gap: 14 }}>
+          <div style={{ display: "grid", gap: 16 }}>
             {items.map((it) => {
               const b = it.books;
               const d = drafts[it.book_id];
-              const status = d?.status ?? it.status;
 
               return (
                 <div
@@ -307,140 +173,23 @@ export default function LibraryPage() {
                     borderRadius: UI.radiusCard,
                     padding: 16,
                     background: UI.cardBg,
-                    boxShadow: UI.shadow,
                   }}
                 >
-                  {/* Card header */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 14,
-                      alignItems: "flex-start",
-                    }}
-                  >
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                        <div style={{ fontWeight: 700, fontSize: 16, color: UI.text, wordBreak: "break-word" }}>
-                          {b?.title ?? "Untitled"}
-                        </div>
-                        <span style={pillStyle()}>{STATUS_LABEL[status]}</span>
-                      </div>
-                      <div style={{ marginTop: 6, fontSize: 13, color: UI.muted }}>
-                        {b?.author ?? "Unknown author"}
-                      </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{b?.title}</div>
+                      <div style={{ fontSize: 13, color: UI.muted }}>{b?.author}</div>
                     </div>
 
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
-                      <Link
-                        href={`/books/${it.book_id}`}
-                        style={{
-                          textDecoration: "none",
-                          fontSize: 13,
-                          fontWeight: 650,
-                          color: UI.text,
-                          padding: "8px 10px",
-                          borderRadius: UI.radiusControl,
-                          border: `1px solid ${UI.border}`,
-                          background: "#fff",
-                        }}
-                      >
-                        Open
-                      </Link>
-
-                      <button
-                        onClick={() => remove(it.book_id)}
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 650,
-                          padding: "8px 10px",
-                          borderRadius: UI.radiusControl,
-                          border: `1px solid ${UI.dangerBorder}`,
-                          background: UI.dangerBg,
-                          color: UI.danger,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
+                    <span style={pillStyle()}>
+                      {STATUS_LABEL[d?.status ?? it.status]}
+                    </span>
                   </div>
 
-                  {/* Controls */}
-                  <div style={{ marginTop: 14, display: "flex", gap: 12, flexWrap: "wrap" }}>
-                    <label style={{ display: "grid", gap: 6, minWidth: 220 }}>
-                      <div style={{ fontSize: 12, color: UI.muted }}>Status</div>
-                      <select
-                        value={status}
-                        onChange={(e) =>
-                          setDrafts((m) => ({
-                            ...m,
-                            [it.book_id]: {
-                              ...(m[it.book_id] ?? {
-                                status: it.status,
-                                rating: it.rating ?? "",
-                                notes: it.notes ?? "",
-                              }),
-                              status: e.target.value as any,
-                            },
-                          }))
-                        }
-                        style={{
-                          padding: "10px 12px",
-                          borderRadius: UI.radiusControl,
-                          border: `1px solid ${UI.border}`,
-                          background: "#fff",
-                          fontSize: 14,
-                          outline: "none",
-                        }}
-                      >
-                        <option value="want_to_read">Want to read</option>
-                        <option value="reading">Reading</option>
-                        <option value="finished">Finished</option>
-                        <option value="dnf">DNF</option>
-                      </select>
-                    </label>
-
-                    <label style={{ display: "grid", gap: 6, minWidth: 220 }}>
-                      <div style={{ fontSize: 12, color: UI.muted }}>Rating</div>
-                      <select
-                        value={d?.rating ?? (it.rating ?? "")}
-                        onChange={(e) =>
-                          setDrafts((m) => ({
-                            ...m,
-                            [it.book_id]: {
-                              ...(m[it.book_id] ?? {
-                                status: it.status,
-                                rating: it.rating ?? "",
-                                notes: it.notes ?? "",
-                              }),
-                              rating: e.target.value === "" ? "" : Number(e.target.value),
-                            },
-                          }))
-                        }
-                        style={{
-                          padding: "10px 12px",
-                          borderRadius: UI.radiusControl,
-                          border: `1px solid ${UI.border}`,
-                          background: "#fff",
-                          fontSize: 14,
-                          outline: "none",
-                        }}
-                      >
-                        <option value="">No rating</option>
-                        <option value="1">1 ★</option>
-                        <option value="2">2 ★★</option>
-                        <option value="3">3 ★★★</option>
-                        <option value="4">4 ★★★★</option>
-                        <option value="5">5 ★★★★★</option>
-                      </select>
-                    </label>
-                  </div>
-
-                  <label style={{ display: "grid", gap: 6, marginTop: 12 }}>
-                    <div style={{ fontSize: 12, color: UI.muted }}>Notes</div>
-                    <textarea
-                      value={d?.notes ?? (it.notes ?? "")}
+                  {/* STATUS */}
+                  <div style={{ marginTop: 12 }}>
+                    <select
+                      value={d?.status ?? it.status}
                       onChange={(e) =>
                         setDrafts((m) => ({
                           ...m,
@@ -449,73 +198,121 @@ export default function LibraryPage() {
                               status: it.status,
                               rating: it.rating ?? "",
                               notes: it.notes ?? "",
+                              progress: it.progress ?? 0,
                             }),
-                            notes: e.target.value,
+                            status: e.target.value as any,
                           },
                         }))
                       }
-                      placeholder="Write your thoughts…"
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: UI.radiusControl,
-                        border: `1px solid ${UI.border}`,
-                        background: "#fff",
-                        minHeight: 90,
-                        fontSize: 14,
-                        outline: "none",
-                        resize: "vertical",
-                      }}
+                    >
+                      <option value="want_to_read">Want to read</option>
+                      <option value="reading">Reading</option>
+                      <option value="finished">Finished</option>
+                      <option value="dnf">DNF</option>
+                    </select>
+                  </div>
+
+                  {/* PROGRESS */}
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 12, color: UI.muted }}>Progress</div>
+
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={d?.progress ?? 0}
+                      onChange={(e) =>
+                        setDrafts((m) => ({
+                          ...m,
+                          [it.book_id]: {
+                            ...(m[it.book_id] ?? {
+                              status: it.status,
+                              rating: it.rating ?? "",
+                              notes: it.notes ?? "",
+                              progress: it.progress ?? 0,
+                            }),
+                            progress: Number(e.target.value),
+                          },
+                        }))
+                      }
                     />
-                  </label>
 
-                  {/* Footer */}
-                  <div
-                    style={{
-                      marginTop: 12,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 10,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div>
-                      {savedFor[it.book_id] && (
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            fontSize: 13,
-                            color: UI.accent,
-                            background: UI.accentSoftBg,
-                            border: `1px solid ${UI.accentSoftBorder}`,
-                            borderRadius: 999,
-                            padding: "6px 10px",
-                          }}
-                        >
-                          Saved ✅
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      onClick={() => save(it.book_id)}
-                      disabled={!!savingFor[it.book_id]}
+                    <div
                       style={{
-                        padding: "10px 14px",
-                        borderRadius: UI.radiusControl,
-                        border: `1px solid ${UI.accentSoftBorder}`,
-                        background: UI.accentSoftBg,
-                        color: UI.accent,
-                        cursor: savingFor[it.book_id] ? "not-allowed" : "pointer",
-                        opacity: savingFor[it.book_id] ? 0.6 : 1,
-                        fontSize: 13,
-                        fontWeight: 750,
+                        height: 8,
+                        background: "#eee",
+                        borderRadius: 999,
+                        marginTop: 6,
                       }}
                     >
-                      {savingFor[it.book_id] ? "Saving…" : "Save changes"}
-                    </button>
+                      <div
+                        style={{
+                          width: `${d?.progress ?? it.progress ?? 0}%`,
+                          height: "100%",
+                          background: "#22c55e",
+                          borderRadius: 999,
+                        }}
+                      />
+                    </div>
                   </div>
+
+                  {/* RATING */}
+                  <div style={{ marginTop: 12 }}>
+                    <select
+                      value={d?.rating ?? it.rating ?? ""}
+                      onChange={(e) =>
+                        setDrafts((m) => ({
+                          ...m,
+                          [it.book_id]: {
+                            ...(m[it.book_id] ?? {
+                              status: it.status,
+                              rating: it.rating ?? "",
+                              notes: it.notes ?? "",
+                              progress: it.progress ?? 0,
+                            }),
+                            rating: e.target.value === "" ? "" : Number(e.target.value),
+                          },
+                        }))
+                      }
+                    >
+                      <option value="">No rating</option>
+                      <option value="1">1 ★</option>
+                      <option value="2">2 ★★</option>
+                      <option value="3">3 ★★★</option>
+                      <option value="4">4 ★★★★</option>
+                      <option value="5">5 ★★★★★</option>
+                    </select>
+                  </div>
+
+                  {/* NOTES */}
+                  <textarea
+                    style={{ marginTop: 12, width: "100%" }}
+                    value={d?.notes ?? it.notes ?? ""}
+                    onChange={(e) =>
+                      setDrafts((m) => ({
+                        ...m,
+                        [it.book_id]: {
+                          ...(m[it.book_id] ?? {
+                            status: it.status,
+                            rating: it.rating ?? "",
+                            notes: it.notes ?? "",
+                            progress: it.progress ?? 0,
+                          }),
+                          notes: e.target.value,
+                        },
+                      }))
+                    }
+                  />
+
+                  <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
+                    <button onClick={() => save(it.book_id)}>
+                      {savingFor[it.book_id] ? "Saving…" : "Save"}
+                    </button>
+
+                    <button onClick={() => remove(it.book_id)}>Remove</button>
+                  </div>
+
+                  {savedFor[it.book_id] && <div>Saved!</div>}
                 </div>
               );
             })}
